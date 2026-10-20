@@ -14,10 +14,14 @@ public struct SignedDiff: Sendable {
     public let values: [Int16]
     /// Pixels with a non-zero difference in at least one channel.
     public let changedPixelCount: Int
-    /// Per-channel minimum of D (R, G, B).
+    /// Per-channel minimum of D (R, G, B) over every compared pixel.
     public let channelMin: [Int16]
-    /// Per-channel maximum of D (R, G, B).
+    /// Per-channel maximum of D (R, G, B) over every compared pixel.
     public let channelMax: [Int16]
+    /// True when both rasters have the same width and height. When they
+    /// differ, pixels outside the common region exist on one side only and
+    /// D says nothing about them.
+    public let sizesMatch: Bool
 
     public init(original: PageRaster, output: PageRaster) throws {
         guard original.dpi == output.dpi else {
@@ -27,8 +31,10 @@ public struct SignedDiff: Sendable {
         let height = min(original.height, output.height)
         var values = [Int16](repeating: 0, count: width * height * 3)
         var changed = 0
-        var low: [Int16] = [0, 0, 0]
-        var high: [Int16] = [0, 0, 0]
+        // PageRaster guarantees at least one pixel, so the common region is
+        // never empty and the extremes start from the first compared pixel.
+        var low: [Int16] = [.max, .max, .max]
+        var high: [Int16] = [.min, .min, .min]
         for y in 0..<height {
             let rowA = y * original.width * 3
             let rowB = y * output.width * 3
@@ -38,11 +44,9 @@ public struct SignedDiff: Sendable {
                 for c in 0..<3 {
                     let d = Int16(output.pixels[rowB + x * 3 + c]) - Int16(original.pixels[rowA + x * 3 + c])
                     values[rowD + x * 3 + c] = d
-                    if d != 0 {
-                        any = true
-                        if d < low[c] { low[c] = d }
-                        if d > high[c] { high[c] = d }
-                    }
+                    if d != 0 { any = true }
+                    if d < low[c] { low[c] = d }
+                    if d > high[c] { high[c] = d }
                 }
                 if any { changed += 1 }
             }
@@ -54,6 +58,7 @@ public struct SignedDiff: Sendable {
         self.changedPixelCount = changed
         self.channelMin = low
         self.channelMax = high
+        self.sizesMatch = original.width == output.width && original.height == output.height
     }
 
     /// Bitmap pixels per bp.

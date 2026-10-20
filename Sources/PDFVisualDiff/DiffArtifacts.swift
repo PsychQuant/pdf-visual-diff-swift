@@ -11,6 +11,9 @@ public struct DiffArtifactReport: Codable, Equatable, Sendable {
     public let changedPixelCount: Int
     public let channelMin: [Int16]
     public let channelMax: [Int16]
+    /// The identity check's result, when it ran: the two pages have the same
+    /// raster size and no pixel differs.
+    public let identical: Bool?
     public let overlayChecks: [CheckResult]?
     public let preservedRegions: [PreservedRegionResult]?
     /// Layout of diff.bin.
@@ -27,8 +30,11 @@ public struct DiffArtifactReport: Codable, Equatable, Sendable {
 public enum DiffArtifacts {
     public static let rawFormat = "int16-le, row-major height x width x 3 (R,G,B), D = output - original"
 
+    /// Pass the results of the checks that ran: `checks` for an overlay,
+    /// `preserved` for preserved regions, `identical` for the identity check.
     public static func write(diff: SignedDiff, checks: [CheckResult]? = nil,
-                             preserved: [PreservedRegionResult]? = nil, to directory: URL) throws {
+                             preserved: [PreservedRegionResult]? = nil, identical: Bool? = nil,
+                             to directory: URL) throws {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         } catch {
@@ -50,7 +56,7 @@ public enum DiffArtifacts {
 
         let report = DiffArtifactReport(width: diff.width, height: diff.height, dpi: diff.dpi,
                                         changedPixelCount: diff.changedPixelCount, channelMin: diff.channelMin,
-                                        channelMax: diff.channelMax, overlayChecks: checks,
+                                        channelMax: diff.channelMax, identical: identical, overlayChecks: checks,
                                         preservedRegions: preserved, rawFormat: rawFormat)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

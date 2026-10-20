@@ -42,7 +42,7 @@ struct DiffArtifactsTests {
         #expect(report.height == verification.diff.height)
         #expect(report.dpi == 72)
         #expect(report.changedPixelCount == 20 * 20)
-        #expect(report.overlayChecks?.count == 4)
+        #expect(report.overlayChecks?.count == OverlayCheck.allCases.count)
 
         let raw = try Data(contentsOf: dir.appendingPathComponent("diff.bin"))
         #expect(raw.count == report.width * report.height * 3 * 2)

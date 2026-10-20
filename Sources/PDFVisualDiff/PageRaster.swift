@@ -28,6 +28,13 @@ public struct PageRaster: Equatable, Sendable {
     /// Bitmap pixels per bp.
     public var scale: Double { dpi / 72 }
 
+    /// The highest resolution accepted.
+    public static let maxDPI = 2400.0
+    /// The largest bitmap accepted, in pixels. Rendering needs about 7 bytes
+    /// per pixel (RGBA bitmap plus the RGB copy), so this caps one render at
+    /// roughly 1.4 GB.
+    public static let maxPixelCount = 200_000_000
+
     public func rgb(x: Int, y: Int) -> [UInt8] {
         let i = (y * width + x) * 3
         return [pixels[i], pixels[i + 1], pixels[i + 2]]
@@ -64,15 +71,18 @@ public struct PageRaster: Equatable, Sendable {
     /// the part of the page inside it is drawn. The transform is the same as
     /// for a full render, so pixels line up with a full render.
     static func render(page: CGPDFPage, dpi: Double, clip: CGRect?) throws -> PageRaster {
-        guard dpi.isFinite, dpi > 0 else { throw PDFVisualDiffError.invalidResolution(dpi) }
+        guard dpi.isFinite, dpi > 0, dpi <= maxDPI else { throw PDFVisualDiffError.invalidResolution(dpi) }
         let rotation = ((Int(page.rotationAngle) % 360) + 360) % 360
         guard rotation == 0 else { throw PDFVisualDiffError.unsupportedRotation(degrees: rotation) }
 
         let box = page.getBoxRect(.cropBox)
         let scale = dpi / 72
-        let width = Int((box.width * scale).rounded(.up))
-        let height = Int((box.height * scale).rounded(.up))
-        guard width > 0, height > 0,
+        let w = (box.width * scale).rounded(.up), h = (box.height * scale).rounded(.up)
+        guard w.isFinite, h.isFinite, w >= 1, h >= 1, w * h <= Double(maxPixelCount) else {
+            throw PDFVisualDiffError.bitmapTooLarge(width: w, height: h, limit: maxPixelCount)
+        }
+        let width = Int(w), height = Int(h)
+        guard
               let space = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(
                 data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,

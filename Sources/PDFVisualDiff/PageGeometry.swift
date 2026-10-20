@@ -45,8 +45,11 @@ public enum PageGeometry {
             strips.append(CGRect(x: box.minX + target.width, y: box.minY, width: box.width - target.width, height: box.height))
         }
         if box.height > target.height {
-            // PDF coordinates: the bottom of the page is minY.
-            strips.append(CGRect(x: box.minX, y: box.minY, width: box.width, height: box.height - target.height))
+            // PDF coordinates: the bottom of the page is minY. The corner it
+            // shares with the right strip belongs to the right strip only, so
+            // no pixel is counted twice.
+            strips.append(CGRect(x: box.minX, y: box.minY, width: min(box.width, target.width),
+                                 height: box.height - target.height))
         }
         var inked = 0
         for strip in strips {

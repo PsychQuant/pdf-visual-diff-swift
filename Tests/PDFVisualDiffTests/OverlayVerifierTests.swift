@@ -19,7 +19,7 @@ struct OverlayVerifierTests {
         report.result(for: check).count
     }
 
-    @Test("a clean overlay on a near-A4 form passes all four checks")
+    @Test("a clean overlay on a near-A4 form passes every check")
     func cleanOverlay() throws {
         let typed = SyntheticPDF.Item.text("42", at: CGPoint(x: 123, y: 310), size: 12, font: "Helvetica")
         let original = try raster(SyntheticPDF.nearA4, Self.form)

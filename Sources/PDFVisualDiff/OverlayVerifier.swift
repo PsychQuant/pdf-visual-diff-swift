@@ -1,9 +1,11 @@
 import Foundation
 
-/// The four checks that decide whether an overlay was added without touching
-/// the original.
+/// The five checks that decide whether an overlay was added without touching
+/// the original, and was added in full.
 public enum OverlayCheck: String, Codable, CaseIterable, Sendable {
-    /// The overlay render is pure white at a pixel, yet D is non-zero there.
+    /// The overlay render is pure white at a pixel, yet the output differs
+    /// from the original there. Where the output is larger than the original,
+    /// any output ink the overlay does not account for counts.
     case differenceOutsideOverlay
     /// D > 0 in some channel: ink of the original was covered or removed.
     case originalMadeLighter
@@ -12,6 +14,10 @@ public enum OverlayCheck: String, Codable, CaseIterable, Sendable {
     case overlayInkOnOriginalInk
     /// The original has ink outside the output's size (cropped away).
     case inkInCroppedStrip
+    /// The overlay has ink at a pixel where the output is white and the
+    /// original is white or absent, or the pixel lies outside the output: the
+    /// typed text did not reach the output.
+    case overlayMissingFromOutput
 }
 
 public struct CheckResult: Codable, Equatable, Sendable {
@@ -56,7 +62,12 @@ public enum OverlayVerifier {
         func overlayInk(_ x: Int, _ y: Int) -> Bool {
             x < overlay.width && y < overlay.height && !overlay.isWhite(x: x, y: y)
         }
-        let outside: (Int, Int) -> Bool = { x, y in diff.isChanged(x: x, y: y) && !overlayInk(x, y) }
+        // Over the output's whole area: inside the common region D decides,
+        // beyond it (output larger than the original) any output ink does.
+        let outside: (Int, Int) -> Bool = { x, y in
+            guard !overlayInk(x, y) else { return false }
+            return x < w && y < h ? diff.isChanged(x: x, y: y) : !output.isWhite(x: x, y: y)
+        }
         let lighter: (Int, Int) -> Bool = { x, y in
             let i = (y * w + x) * 3
             return diff.values[i] > 0 || diff.values[i + 1] > 0 || diff.values[i + 2] > 0
@@ -73,11 +84,20 @@ public enum OverlayVerifier {
             (x >= w || y >= h) && !original.isWhite(x: x, y: y)
         }
 
+        // Over the overlay's whole area.
+        let missing: (Int, Int) -> Bool = { x, y in
+            guard !overlay.isWhite(x: x, y: y) else { return false }
+            guard x < output.width, y < output.height else { return true }
+            let originalWhite = x >= original.width || y >= original.height || original.isWhite(x: x, y: y)
+            return originalWhite && output.isWhite(x: x, y: y)
+        }
+
         let checks = [
-            result(.differenceOutsideOverlay, width: w, height: h, outside),
+            result(.differenceOutsideOverlay, width: output.width, height: output.height, outside),
             result(.originalMadeLighter, width: w, height: h, lighter),
             result(.overlayInkOnOriginalInk, width: w, height: h, inkOnInk),
             cropped,
+            result(.overlayMissingFromOutput, width: overlay.width, height: overlay.height, missing),
         ]
         let report = OverlayReport(width: w, height: h, dpi: diff.dpi, changedPixelCount: diff.changedPixelCount,
                                    channelMin: diff.channelMin, channelMax: diff.channelMax, checks: checks)
