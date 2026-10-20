@@ -13,7 +13,7 @@ struct SignedDiffTests {
     func identical() throws {
         let items: [SyntheticPDF.Item] = [
             .line(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 300, y: 100), width: 1),
-            .text("115", at: CGPoint(x: 180, y: 237.5), size: 12, font: "Helvetica"),
+            .text("42", at: CGPoint(x: 123, y: 310), size: 12, font: "Helvetica"),
         ]
         let original = try render(SyntheticPDF.a4, items)
         let copy = try render(SyntheticPDF.a4, items)
@@ -26,7 +26,7 @@ struct SignedDiffTests {
     @Test("black text added on white darkens every changed channel")
     func blackTextDarkens() throws {
         let original = try render(SyntheticPDF.a4, [])
-        let output = try render(SyntheticPDF.a4, [.text("115", at: CGPoint(x: 180, y: 237.5), size: 12, font: "Helvetica")])
+        let output = try render(SyntheticPDF.a4, [.text("42", at: CGPoint(x: 123, y: 310), size: 12, font: "Helvetica")])
         let diff = try SignedDiff(original: original, output: output)
         #expect(diff.changedPixelCount > 0)
         #expect(diff.channelMax == [0, 0, 0])
@@ -56,7 +56,7 @@ struct SignedDiffTests {
 
     @Test("rasters are compared over their common top-left region")
     func commonRegion() throws {
-        let original = try render(SyntheticPDF.pdfMakerA4, [])
+        let original = try render(SyntheticPDF.nearA4, [])
         let output = try render(SyntheticPDF.a4, [])
         let diff = try SignedDiff(original: original, output: output)
         #expect(diff.width == 1191)

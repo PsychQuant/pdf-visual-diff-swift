@@ -9,7 +9,7 @@ struct PageRasterTests {
     func sameBytesTwice() throws {
         let url = try SyntheticPDF.make(size: SyntheticPDF.a4, [
             .line(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 300, y: 100), width: 1),
-            .text("Form 115", at: CGPoint(x: 120, y: 200), size: 12, font: "Helvetica"),
+            .text("Field 42", at: CGPoint(x: 120, y: 200), size: 12, font: "Helvetica"),
         ])
         let first = try PageRaster.render(url: url, pageIndex: 0, dpi: 144)
         let second = try PageRaster.render(url: url, pageIndex: 0, dpi: 144)
@@ -20,7 +20,7 @@ struct PageRasterTests {
 
     @Test("buffer size is the ceiling of page size times dpi/72", arguments: [
         (SyntheticPDF.a4, 144.0, 1191, 1684),
-        (SyntheticPDF.pdfMakerA4, 144.0, 1191, 1685),
+        (SyntheticPDF.nearA4, 144.0, 1192, 1686),
         (CGSize(width: 612, height: 792), 72.0, 612, 792),
     ])
     func bufferSize(size: CGSize, dpi: Double, width: Int, height: Int) throws {

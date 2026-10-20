@@ -8,8 +8,8 @@ public enum PageGeometry {
     public static let a4 = CGSize(width: 210 / 25.4 * 72, height: 297 / 25.4 * 72)
 
     /// A page within this many bp of A4 in both dimensions is "near A4".
-    /// Word documents exported through Acrobat PDFMaker are A4 rounded to a
-    /// 600 dpi dot grid, e.g. 4961 × 7017 dots = 595.32 × 842.04 bp.
+    /// PDFs exported through Acrobat PDFMaker are A4 rounded to a 600 dpi
+    /// dot grid: 4960.63 × 7015.75 dots become 4961 × 7016 = 595.32 × 841.92 bp.
     public static let nearA4Tolerance = 1.5
 
     /// Sizes that differ from A4 by at most this much (bp) are exact A4;

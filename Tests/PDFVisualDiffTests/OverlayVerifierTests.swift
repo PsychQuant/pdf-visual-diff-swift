@@ -5,10 +5,10 @@ import Testing
 
 struct OverlayVerifierTests {
 
-    // The spec example: a near-A4 blank form with one line and the label 年.
+    // The spec example: a near-A4 blank form with one line and the label 甲.
     static let form: [SyntheticPDF.Item] = [
         .line(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 300, y: 100), width: 1),
-        .text("年", at: CGPoint(x: 207, y: 227.5), size: 12, font: "PingFang TC"),
+        .text("甲", at: CGPoint(x: 150, y: 300), size: 12, font: "PingFang TC"),
     ]
 
     private func raster(_ size: CGSize, _ items: [SyntheticPDF.Item]) throws -> PageRaster {
@@ -21,8 +21,8 @@ struct OverlayVerifierTests {
 
     @Test("a clean overlay on a near-A4 form passes all four checks")
     func cleanOverlay() throws {
-        let typed = SyntheticPDF.Item.text("115", at: CGPoint(x: 180, y: 237.5), size: 12, font: "Helvetica")
-        let original = try raster(SyntheticPDF.pdfMakerA4, Self.form)
+        let typed = SyntheticPDF.Item.text("42", at: CGPoint(x: 123, y: 310), size: 12, font: "Helvetica")
+        let original = try raster(SyntheticPDF.nearA4, Self.form)
         let output = try raster(SyntheticPDF.a4, Self.form + [typed])
         let overlay = try raster(SyntheticPDF.a4, [typed])
         let result = try OverlayVerifier.verify(original: original, output: output, overlay: overlay)
@@ -35,20 +35,20 @@ struct OverlayVerifierTests {
 
     @Test("typed text over a printed label is located inside the label's box")
     func collisionIsLocated() throws {
-        // Same baseline as 年, starting 2 bp to its left: the digits run into the glyph.
-        let typed = SyntheticPDF.Item.text("115", at: CGPoint(x: 205, y: 227.5), size: 12, font: "Helvetica")
-        let original = try raster(SyntheticPDF.pdfMakerA4, Self.form)
+        // Same baseline as 甲, starting 2 bp to its left: the digits run into the glyph.
+        let typed = SyntheticPDF.Item.text("42", at: CGPoint(x: 148, y: 300), size: 12, font: "Helvetica")
+        let original = try raster(SyntheticPDF.nearA4, Self.form)
         let output = try raster(SyntheticPDF.a4, Self.form + [typed])
         let overlay = try raster(SyntheticPDF.a4, [typed])
         let report = try OverlayVerifier.verify(original: original, output: output, overlay: overlay).report
         let overlap = report.result(for: .overlayInkOnOriginalInk)
         #expect(overlap.count > 0)
         #expect(!report.passed)
-        // 年 at 12 pt with its baseline at y = 227.5 starting at x = 207 occupies
-        // roughly x 207…219 and y 216…229 bp.
+        // 甲 at 12 pt with its baseline at y = 300 starting at x = 150 occupies
+        // roughly x 150…162 and y 288…302 bp.
         let band = try #require(overlap.bands.first)
-        #expect(band.left >= 205 && band.right <= 220)
-        #expect(band.top >= 214 && band.bottom <= 230)
+        #expect(band.left >= 148 && band.right <= 163)
+        #expect(band.top >= 286 && band.bottom <= 303)
     }
 
     @Test("overlay ink exactly on original ink is reported even though D is zero there")
