@@ -14,9 +14,10 @@ public enum OverlayCheck: String, Codable, CaseIterable, Sendable {
     case overlayInkOnOriginalInk
     /// The original has ink outside the output's size (cropped away).
     case inkInCroppedStrip
-    /// The overlay has ink at a pixel where the output is white and the
-    /// original is white or absent, or the pixel lies outside the output: the
-    /// typed text did not reach the output.
+    /// The overlay has ink at a pixel that lies outside the output, or where
+    /// the original is white or absent and the output does not show exactly
+    /// the overlay's colour: the typed text did not reach the output, or
+    /// reached it faint or in another colour.
     case overlayMissingFromOutput
 }
 
@@ -84,12 +85,14 @@ public enum OverlayVerifier {
             (x >= w || y >= h) && !original.isWhite(x: x, y: y)
         }
 
-        // Over the overlay's whole area.
+        // Over the overlay's whole area. Where the original is blank, the
+        // overlay composited onto it is the overlay's own render, so the
+        // output has to match it exactly.
         let missing: (Int, Int) -> Bool = { x, y in
             guard !overlay.isWhite(x: x, y: y) else { return false }
             guard x < output.width, y < output.height else { return true }
             let originalWhite = x >= original.width || y >= original.height || original.isWhite(x: x, y: y)
-            return originalWhite && output.isWhite(x: x, y: y)
+            return originalWhite && output.rgb(x: x, y: y) != overlay.rgb(x: x, y: y)
         }
 
         let checks = [

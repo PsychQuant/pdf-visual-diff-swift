@@ -13,6 +13,8 @@ enum SyntheticPDF {
         case text(String, at: CGPoint, size: CGFloat, font: String)
         /// A solid black rectangle.
         case fill(CGRect)
+        /// Text like `.text`, in a grey level (0 black, 1 white).
+        case greyText(String, at: CGPoint, size: CGFloat, font: String, grey: CGFloat)
     }
 
     struct Page {
@@ -55,8 +57,10 @@ enum SyntheticPDF {
     private static func draw(_ item: Item, in context: CGContext, pageHeight h: CGFloat) {
         context.saveGState()
         defer { context.restoreGState() }
-        context.setFillColor(CGColor(gray: 0, alpha: 1))
-        context.setStrokeColor(CGColor(gray: 0, alpha: 1))
+        if case .greyText = item {} else {
+            context.setFillColor(CGColor(gray: 0, alpha: 1))
+            context.setStrokeColor(CGColor(gray: 0, alpha: 1))
+        }
         switch item {
         case let .line(from, to, width):
             context.setLineWidth(width)
@@ -65,15 +69,24 @@ enum SyntheticPDF {
             context.strokePath()
         case let .fill(rect):
             context.fill(CGRect(x: rect.minX, y: h - rect.maxY, width: rect.width, height: rect.height))
+        case let .greyText(string, at, size, fontName, grey):
+            context.setFillColor(CGColor(gray: grey, alpha: 1))
+            drawText(string, at: at, size: size, font: fontName, in: context, pageHeight: h)
         case let .text(string, at, size, fontName):
-            let font = CTFontCreateWithName(fontName as CFString, size, nil)
-            let attributes: [NSAttributedString.Key: Any] = [
-                NSAttributedString.Key(kCTFontAttributeName as String): font,
-                NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true,
-            ]
-            let line = CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: attributes))
-            context.textPosition = CGPoint(x: at.x, y: h - at.y)
-            CTLineDraw(line, context)
+            drawText(string, at: at, size: size, font: fontName, in: context, pageHeight: h)
         }
+    }
+
+    /// Draws with the context's current fill colour.
+    private static func drawText(_ string: String, at: CGPoint, size: CGFloat, font fontName: String,
+                                 in context: CGContext, pageHeight h: CGFloat) {
+        let font = CTFontCreateWithName(fontName as CFString, size, nil)
+        let attributes: [NSAttributedString.Key: Any] = [
+            NSAttributedString.Key(kCTFontAttributeName as String): font,
+            NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true,
+        ]
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: attributes))
+        context.textPosition = CGPoint(x: at.x, y: h - at.y)
+        CTLineDraw(line, context)
     }
 }

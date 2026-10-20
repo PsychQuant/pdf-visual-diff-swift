@@ -10,6 +10,7 @@ public enum PDFVisualDiffError: Error, Equatable, CustomStringConvertible {
     case bitmapContextUnavailable(width: Int, height: Int)
     case bitmapTooLarge(width: Double, height: Double, limit: Int)
     case invalidRegion(index: Int)
+    case invalidRaster(width: Int, height: Int, bytes: Int)
     case sizeMismatch(String)
     case inkInRemovedStrip(pixels: Int)
     case artifactWriteFailed(String)
@@ -28,6 +29,8 @@ public enum PDFVisualDiffError: Error, Equatable, CustomStringConvertible {
             return "cannot allocate a \(width)×\(height) bitmap"
         case let .bitmapTooLarge(width, height, limit):
             return "a \(width)×\(height) pixel bitmap exceeds the limit of \(limit) pixels; lower the resolution"
+        case let .invalidRaster(width, height, bytes):
+            return "a raster must be at least 1 × 1 pixel with width × height × 3 bytes; got \(width) × \(height) with \(bytes) bytes"
         case .invalidRegion(let index):
             return "preserved region \(index) must have finite coordinates with left < right and top < bottom"
         case .sizeMismatch(let detail):

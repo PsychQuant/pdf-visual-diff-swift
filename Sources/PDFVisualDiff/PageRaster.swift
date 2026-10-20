@@ -16,8 +16,14 @@ public struct PageRaster: Equatable, Sendable {
     /// RGB bytes, row-major, top row first: `pixels[(y * width + x) * 3 + c]`.
     public let pixels: [UInt8]
 
-    public init(width: Int, height: Int, dpi: Double, pageSize: CGSize, pixels: [UInt8]) {
-        precondition(pixels.count == width * height * 3, "pixel buffer does not match width × height × 3")
+    /// Throws when the size is not positive or the buffer does not hold
+    /// width × height × 3 bytes.
+    public init(width: Int, height: Int, dpi: Double, pageSize: CGSize, pixels: [UInt8]) throws {
+        let (area, areaOverflow) = width.multipliedReportingOverflow(by: height)
+        let (bytes, bytesOverflow) = area.multipliedReportingOverflow(by: 3)
+        guard width > 0, height > 0, !areaOverflow, !bytesOverflow, pixels.count == bytes else {
+            throw PDFVisualDiffError.invalidRaster(width: width, height: height, bytes: pixels.count)
+        }
         self.width = width
         self.height = height
         self.dpi = dpi
@@ -30,10 +36,11 @@ public struct PageRaster: Equatable, Sendable {
 
     /// The highest resolution accepted.
     public static let maxDPI = 2400.0
-    /// The largest bitmap accepted, in pixels. Rendering needs about 7 bytes
-    /// per pixel (RGBA bitmap plus the RGB copy), so this caps one render at
-    /// roughly 1.4 GB.
-    public static let maxPixelCount = 200_000_000
+    /// The largest bitmap accepted, in pixels. One render needs about 7 bytes
+    /// per pixel while it runs (RGBA bitmap plus the RGB copy) and keeps 3. A
+    /// verification holds three renders and D (6 bytes per pixel), about 15
+    /// bytes per pixel, so this keeps one verification under roughly 1.5 GB.
+    public static let maxPixelCount = 100_000_000
 
     public func rgb(x: Int, y: Int) -> [UInt8] {
         let i = (y * width + x) * 3
@@ -67,10 +74,11 @@ public struct PageRaster: Equatable, Sendable {
         try render(page: page, dpi: dpi, clip: nil)
     }
 
-    /// Renders `page`; when `clip` is given (in PDF page coordinates), only
-    /// the part of the page inside it is drawn. The transform is the same as
-    /// for a full render, so pixels line up with a full render.
-    static func render(page: CGPDFPage, dpi: Double, clip: CGRect?) throws -> PageRaster {
+    /// Renders `page`; when `clip` is given (rectangles in PDF page
+    /// coordinates), only the part of the page inside their union is drawn.
+    /// The transform is the same as for a full render, so pixels line up
+    /// with a full render.
+    static func render(page: CGPDFPage, dpi: Double, clip: [CGRect]?) throws -> PageRaster {
         guard dpi.isFinite, dpi > 0, dpi <= maxDPI else { throw PDFVisualDiffError.invalidResolution(dpi) }
         let rotation = ((Int(page.rotationAngle) % 360) + 360) % 360
         guard rotation == 0 else { throw PDFVisualDiffError.unsupportedRotation(degrees: rotation) }
@@ -113,6 +121,6 @@ public struct PageRaster: Equatable, Sendable {
             rgb[p * 3 + 1] = rgba[p * 4 + 1]
             rgb[p * 3 + 2] = rgba[p * 4 + 2]
         }
-        return PageRaster(width: width, height: height, dpi: dpi, pageSize: box.size, pixels: rgb)
+        return try PageRaster(width: width, height: height, dpi: dpi, pageSize: box.size, pixels: rgb)
     }
 }

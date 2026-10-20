@@ -18,9 +18,10 @@ public struct SignedDiff: Sendable {
     public let channelMin: [Int16]
     /// Per-channel maximum of D (R, G, B) over every compared pixel.
     public let channelMax: [Int16]
-    /// True when both rasters have the same width and height. When they
-    /// differ, pixels outside the common region exist on one side only and
-    /// D says nothing about them.
+    /// True when both pages have the same size in bp and both rasters the
+    /// same width and height. When they differ, pixels outside the common
+    /// region exist on one side only and D says nothing about them; a page
+    /// size difference smaller than a pixel would not show in D at all.
     public let sizesMatch: Bool
 
     public init(original: PageRaster, output: PageRaster) throws {
@@ -59,6 +60,7 @@ public struct SignedDiff: Sendable {
         self.channelMin = low
         self.channelMax = high
         self.sizesMatch = original.width == output.width && original.height == output.height
+            && original.pageSize == output.pageSize
     }
 
     /// Bitmap pixels per bp.

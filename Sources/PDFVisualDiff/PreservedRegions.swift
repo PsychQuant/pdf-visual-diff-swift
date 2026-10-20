@@ -25,21 +25,17 @@ public enum PreservedRegions {
     /// non-finite coordinate or no area is refused.
     public static func check(_ rects: [CGRect], diff: SignedDiff) throws -> [PreservedRegionResult] {
         let s = diff.scale
-        // Pixel indices this far out are never in a bitmap; clamping first
-        // keeps the Int conversion in range for any finite input.
-        let limit = Double(PageRaster.maxPixelCount)
-        func pixel(_ value: Double, _ rule: FloatingPointRoundingRule) -> Int {
-            Int(max(-limit, min(limit, (value * s).rounded(rule))))
-        }
         return try rects.enumerated().map { index, rect in
             let edges = [rect.origin.x, rect.origin.y, rect.size.width, rect.size.height]
             guard edges.allSatisfy(\.isFinite), rect.size.width > 0, rect.size.height > 0 else {
                 throw PDFVisualDiffError.invalidRegion(index: index)
             }
-            let px0 = pixel(rect.minX, .down), py0 = pixel(rect.minY, .down)
-            let px1 = pixel(rect.maxX, .up), py1 = pixel(rect.maxY, .up)
-            let x0 = max(0, px0), y0 = max(0, py0)
-            let x1 = min(diff.width, px1), y1 = min(diff.height, py1)
+            // Pixel edges in Double: a region far off the page keeps its true
+            // size here, so it can never collapse to an empty, passing region.
+            let px0 = (rect.minX * s).rounded(.down), py0 = (rect.minY * s).rounded(.down)
+            let px1 = (rect.maxX * s).rounded(.up), py1 = (rect.maxY * s).rounded(.up)
+            let x0 = Int(max(0, min(Double(diff.width), px0))), y0 = Int(max(0, min(Double(diff.height), py0)))
+            let x1 = Int(max(0, min(Double(diff.width), px1))), y1 = Int(max(0, min(Double(diff.height), py1)))
             var changed = 0, checked = 0
             if x0 < x1 && y0 < y1 {
                 checked = (x1 - x0) * (y1 - y0)
@@ -47,9 +43,11 @@ public enum PreservedRegions {
                     for x in x0..<x1 where diff.isChanged(x: x, y: y) { changed += 1 }
                 }
             }
+            let outside = max(1, (px1 - px0) * (py1 - py0) - Double(checked))
+            let unchecked = (px1 - px0) * (py1 - py0) == Double(checked) ? 0 : Int(min(outside, Double(Int.max)))
             return PreservedRegionResult(index: index, left: rect.minX, top: rect.minY,
                                          right: rect.maxX, bottom: rect.maxY, changedPixels: changed,
-                                         uncheckedPixels: (px1 - px0) * (py1 - py0) - checked)
+                                         uncheckedPixels: unchecked)
         }
     }
 }
