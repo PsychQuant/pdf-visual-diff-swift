@@ -50,7 +50,9 @@ pass (`uncheckedPixels`), and one with a non-finite coordinate is refused.
 rounded 595 × 842), classifies sizes as exact A4, near A4 (within 1.5 bp) or
 other, finds ink in the strip that a top-left crop to A4 would remove (each
 pixel counted once), and finds ink drawn outside a page's crop box
-(`inkOutsideCropBox`), which every render clips away.
+(`inkOutsideCropBox`), which every render clips away. That check scales x and
+y so the box edges fall on pixel boundaries, so ink on the page never counts
+and ink past the edge always does.
 
 `DiffArtifacts.write` produces `diff_signed.png` (floor(128 + D/2)),
 `diff_abs.png` (255 − |D|), `diff.bin` (D as little-endian Int16, height ×
@@ -64,7 +66,8 @@ symbolic link of the same name is replaced, never written through.
 - Positions are reported in bp (1/72 inch) with a top-left origin.
 - Only unrotated pages are supported; a page with `/Rotate` is refused.
 - Resolution is limited to 2400 dpi and one bitmap to 100 million pixels; a
-  verification holds three renders and D, about 15 bytes per pixel.
+  verification holds three renders and D, about 15 bytes per pixel, and
+  writing the artifacts adds about 12 more while they are encoded.
 - Results are only meaningful within one renderer; this package always uses CoreGraphics.
 
 ## License

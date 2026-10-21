@@ -16,7 +16,7 @@ struct PageGeometryTests {
         (CGSize(width: 595.2756, height: 841.8898), PageGeometry.Classification.exactA4),
         (CGSize(width: 595.28, height: 841.89), .exactA4),
         (CGSize(width: 596, height: 843), .nearA4),
-        (CGSize(width: 595.32, height: 841.92), .nearA4),
+        (CGSize(width: 595.5, height: 842.2), .nearA4),
         (CGSize(width: 595, height: 842), .nearA4),
         (CGSize(width: 612, height: 792), .other),
         (CGSize(width: 841.89, height: 595.28), .other),

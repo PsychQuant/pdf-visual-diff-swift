@@ -61,14 +61,22 @@ public enum PageGeometry {
     /// Counts the pixels with ink drawn outside the page's crop box, up to
     /// one page width or height beyond each edge. A render of the page clips
     /// such ink away, so it is invisible to the overlay checks; text that
-    /// runs past the page edge shows up here. Pixels that straddle the box
-    /// edge are not counted.
+    /// runs past the page edge shows up here. Only the area outside the box
+    /// is drawn, at x and y scales adjusted so the box edges fall exactly on
+    /// pixel boundaries: every pixel is wholly inside or wholly outside the
+    /// box, so ink on the box never reaches an outside pixel and any ink past
+    /// the edge does. The resolution is lowered when the 3 × 3 page area
+    /// would exceed the bitmap limit.
     public static func inkOutsideCropBox(page: CGPDFPage, dpi: Double = 72) throws -> Int {
         guard dpi.isFinite, dpi > 0, dpi <= PageRaster.maxDPI else { throw PDFVisualDiffError.invalidResolution(dpi) }
         let box = page.getBoxRect(.cropBox)
-        let scale = dpi / 72
-        let w = (box.width * 3 * scale).rounded(.up), h = (box.height * 3 * scale).rounded(.up)
-        guard w.isFinite, h.isFinite, w >= 1, h >= 1, w * h <= Double(PageRaster.maxPixelCount) else {
+        let area = Double(box.width) * 3 * Double(box.height) * 3
+        let fitting = 72 * (Double(PageRaster.maxPixelCount) / area).squareRoot() * 0.99
+        let scale = min(dpi, fitting) / 72
+        // Whole pixels per box side, and the scales that make them exact.
+        let boxW = max(1, (box.width * scale).rounded()), boxH = max(1, (box.height * scale).rounded())
+        let w = boxW * 3, h = boxH * 3
+        guard w.isFinite, h.isFinite, w * h <= Double(PageRaster.maxPixelCount) else {
             throw PDFVisualDiffError.bitmapTooLarge(width: w, height: h, limit: PageRaster.maxPixelCount)
         }
         let width = Int(w), height = Int(h)
@@ -79,25 +87,24 @@ public enum PageGeometry {
         else { throw PDFVisualDiffError.bitmapContextUnavailable(width: width, height: height) }
         context.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        // The crop box sits in the middle of a 3 × 3 page area.
-        context.scaleBy(x: scale, y: scale)
+        // The crop box sits in the middle of a 3 × 3 page area; only the
+        // eight pages around it are drawn.
+        context.scaleBy(x: boxW / box.width, y: boxH / box.height)
         context.translateBy(x: box.width - box.minX, y: box.height - box.minY)
+        context.clip(to: [
+            CGRect(x: box.minX - box.width, y: box.minY - box.height, width: box.width, height: box.height * 3),
+            CGRect(x: box.maxX, y: box.minY - box.height, width: box.width, height: box.height * 3),
+            CGRect(x: box.minX, y: box.minY - box.height, width: box.width, height: box.height),
+            CGRect(x: box.minX, y: box.maxY, width: box.width, height: box.height),
+        ])
         context.drawPDFPage(page)
         guard let data = context.data else {
             throw PDFVisualDiffError.bitmapContextUnavailable(width: width, height: height)
         }
         let rgba = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
-        // Pixel columns and rows that lie fully inside the box are skipped,
-        // and so are the ones the box edge passes through.
-        let inX = Int((box.width * scale).rounded(.down))..<Int((box.width * 2 * scale).rounded(.up))
-        let inY = Int((box.height * scale).rounded(.down))..<Int((box.height * 2 * scale).rounded(.up))
         var inked = 0
-        for y in 0..<height {
-            for x in 0..<width where !(inX.contains(x) && inY.contains(y)) {
-                let i = (y * width + x) * 4
-                if rgba[i] != 255 || rgba[i + 1] != 255 || rgba[i + 2] != 255 { inked += 1 }
-            }
-        }
+        for i in stride(from: 0, to: width * height * 4, by: 4)
+        where rgba[i] != 255 || rgba[i + 1] != 255 || rgba[i + 2] != 255 { inked += 1 }
         return inked
     }
 }

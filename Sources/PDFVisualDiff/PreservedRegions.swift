@@ -21,6 +21,9 @@ public struct PreservedRegionResult: Codable, Equatable, Sendable {
 /// every pixel that touches the rectangle, even partly, and every such pixel
 /// has to lie inside the compared area.
 public enum PreservedRegions {
+    /// The largest unchecked-pixel count reported; larger areas saturate here.
+    static let uncheckedCap = 4_611_686_018_427_387_904.0  // 2^62
+
     /// `rects` are in bp with a top-left origin. A rectangle with a
     /// non-finite coordinate or no area is refused.
     public static func check(_ rects: [CGRect], diff: SignedDiff) throws -> [PreservedRegionResult] {
@@ -34,6 +37,9 @@ public enum PreservedRegions {
             // size here, so it can never collapse to an empty, passing region.
             let px0 = (rect.minX * s).rounded(.down), py0 = (rect.minY * s).rounded(.down)
             let px1 = (rect.maxX * s).rounded(.up), py1 = (rect.maxY * s).rounded(.up)
+            guard [px0, py0, px1, py1].allSatisfy(\.isFinite) else {
+                throw PDFVisualDiffError.invalidRegion(index: index)
+            }
             let x0 = Int(max(0, min(Double(diff.width), px0))), y0 = Int(max(0, min(Double(diff.height), py0)))
             let x1 = Int(max(0, min(Double(diff.width), px1))), y1 = Int(max(0, min(Double(diff.height), py1)))
             var changed = 0, checked = 0
@@ -43,8 +49,10 @@ public enum PreservedRegions {
                     for x in x0..<x1 where diff.isChanged(x: x, y: y) { changed += 1 }
                 }
             }
-            let outside = max(1, (px1 - px0) * (py1 - py0) - Double(checked))
-            let unchecked = (px1 - px0) * (py1 - py0) == Double(checked) ? 0 : Int(min(outside, Double(Int.max)))
+            // The area can exceed Int (or even Double) range; 2^62 is a cap
+            // that converts to Int exactly, unlike Double(Int.max) = 2^63.
+            let area = (px1 - px0) * (py1 - py0)
+            let unchecked = area == Double(checked) ? 0 : Int(min(max(1, area - Double(checked)), Self.uncheckedCap))
             return PreservedRegionResult(index: index, left: rect.minX, top: rect.minY,
                                          right: rect.maxX, bottom: rect.maxY, changedPixels: changed,
                                          uncheckedPixels: unchecked)

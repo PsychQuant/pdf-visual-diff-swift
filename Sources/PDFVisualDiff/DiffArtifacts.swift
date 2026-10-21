@@ -32,6 +32,15 @@ public struct DiffArtifactReport: Codable, Equatable, Sendable {
 /// existing file or symbolic link of the same name is replaced, never
 /// written through.
 public enum DiffArtifacts {
+    /// The files `write` creates, in this order.
+    public static let fileNames = ["diff_signed.png", "diff_abs.png", "diff.bin", "report.json"]
+
+    /// Where `write` puts each file for `directory`, so a caller can make
+    /// sure none of them is one of its inputs or outputs before writing.
+    public static func paths(in directory: URL) -> [URL] {
+        fileNames.map { directory.appendingPathComponent($0) }
+    }
+
     public static let rawFormat = "int16-le, row-major height x width x 3 (R,G,B), D = output - original"
 
     /// Pass the results of the checks that ran: `checks` for an overlay,

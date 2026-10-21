@@ -16,9 +16,14 @@ public struct PageRaster: Equatable, Sendable {
     /// RGB bytes, row-major, top row first: `pixels[(y * width + x) * 3 + c]`.
     public let pixels: [UInt8]
 
-    /// Throws when the size is not positive or the buffer does not hold
-    /// width × height × 3 bytes.
+    /// Throws when the size is not positive, the buffer does not hold
+    /// width × height × 3 bytes, the resolution is not a positive finite
+    /// number, or the page size is not positive and finite.
     public init(width: Int, height: Int, dpi: Double, pageSize: CGSize, pixels: [UInt8]) throws {
+        guard dpi.isFinite, dpi > 0 else { throw PDFVisualDiffError.invalidResolution(dpi) }
+        guard pageSize.width.isFinite, pageSize.height.isFinite, pageSize.width > 0, pageSize.height > 0 else {
+            throw PDFVisualDiffError.invalidPageSize(width: Double(pageSize.width), height: Double(pageSize.height))
+        }
         let (area, areaOverflow) = width.multipliedReportingOverflow(by: height)
         let (bytes, bytesOverflow) = area.multipliedReportingOverflow(by: 3)
         guard width > 0, height > 0, !areaOverflow, !bytesOverflow, pixels.count == bytes else {
