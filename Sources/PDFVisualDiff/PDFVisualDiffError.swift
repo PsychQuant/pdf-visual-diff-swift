@@ -14,7 +14,11 @@ public enum PDFVisualDiffError: Error, Equatable, CustomStringConvertible {
     case invalidPageSize(width: Double, height: Double)
     case sizeMismatch(String)
     case inkInRemovedStrip(pixels: Int)
-    case artifactWriteFailed(String)
+    /// Writing an artifact failed; `code` is the Foundation error code when
+    /// there is one, so a caller can explain it in its own language.
+    case artifactWriteFailed(path: String, code: CocoaError.Code?)
+    /// An artifact (named by its file name) could not be encoded.
+    case artifactEncodingFailed(String)
 
     public var description: String {
         switch self {
@@ -40,8 +44,10 @@ public enum PDFVisualDiffError: Error, Equatable, CustomStringConvertible {
             return "rasters do not line up: \(detail)"
         case .inkInRemovedStrip(let pixels):
             return "the strip removed by A4 normalization contains \(pixels) inked pixel\(pixels == 1 ? "" : "s"); refusing to crop content"
-        case .artifactWriteFailed(let detail):
-            return "cannot write diff artifacts: \(detail)"
+        case let .artifactWriteFailed(path, code):
+            return "cannot write diff artifact \(path)" + (code.map { " (Cocoa error \($0.rawValue))" } ?? "")
+        case .artifactEncodingFailed(let name):
+            return "cannot encode diff artifact \(name)"
         }
     }
 }

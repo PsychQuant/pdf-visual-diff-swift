@@ -73,7 +73,7 @@ public enum DiffArtifacts {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         } catch {
-            throw PDFVisualDiffError.artifactWriteFailed("\(directory.path): \(error.localizedDescription)")
+            throw PDFVisualDiffError.artifactWriteFailed(path: directory.path, code: (error as? CocoaError)?.code)
         }
         let count = diff.width * diff.height
         var signed = [UInt8](repeating: 0, count: count * 3)
@@ -86,8 +86,8 @@ public enum DiffArtifacts {
             raw.append(UInt8(bits & 0xFF))
             raw.append(UInt8(bits >> 8))
         }
-        try write(png(signed, width: diff.width, height: diff.height), to: directory.appendingPathComponent("diff_signed.png"))
-        try write(png(absolute, width: diff.width, height: diff.height), to: directory.appendingPathComponent("diff_abs.png"))
+        try write(png(signed, width: diff.width, height: diff.height, name: "diff_signed.png"), to: directory.appendingPathComponent("diff_signed.png"))
+        try write(png(absolute, width: diff.width, height: diff.height, name: "diff_abs.png"), to: directory.appendingPathComponent("diff_abs.png"))
 
         let report = DiffArtifactReport(width: diff.width, height: diff.height, dpi: diff.dpi,
                                         changedPixelCount: diff.changedPixelCount, channelMin: diff.channelMin,
@@ -100,7 +100,7 @@ public enum DiffArtifacts {
         do {
             json = try encoder.encode(report)
         } catch {
-            throw PDFVisualDiffError.artifactWriteFailed("report.json: \(error.localizedDescription)")
+            throw PDFVisualDiffError.artifactEncodingFailed("report.json")
         }
         try write(json, to: directory.appendingPathComponent("report.json"))
     }
@@ -111,11 +111,11 @@ public enum DiffArtifacts {
         do {
             try data.write(to: url, options: .atomic)
         } catch {
-            throw PDFVisualDiffError.artifactWriteFailed("\(url.path): \(error.localizedDescription)")
+            throw PDFVisualDiffError.artifactWriteFailed(path: url.path, code: (error as? CocoaError)?.code)
         }
     }
 
-    private static func png(_ rgb: [UInt8], width: Int, height: Int) throws -> Data {
+    private static func png(_ rgb: [UInt8], width: Int, height: Int, name: String) throws -> Data {
         let data = NSMutableData()
         guard let provider = CGDataProvider(data: Data(rgb) as CFData),
               let space = CGColorSpace(name: CGColorSpace.sRGB),
@@ -124,11 +124,11 @@ public enum DiffArtifacts {
                                   provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent),
               let destination = CGImageDestinationCreateWithData(data as CFMutableData, UTType.png.identifier as CFString, 1, nil)
         else {
-            throw PDFVisualDiffError.artifactWriteFailed("cannot encode a \(width)×\(height) PNG")
+            throw PDFVisualDiffError.artifactEncodingFailed(name)
         }
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else {
-            throw PDFVisualDiffError.artifactWriteFailed("cannot encode a \(width)×\(height) PNG")
+            throw PDFVisualDiffError.artifactEncodingFailed(name)
         }
         return data as Data
     }
