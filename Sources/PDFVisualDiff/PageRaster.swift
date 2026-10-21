@@ -20,7 +20,7 @@ public struct PageRaster: Equatable, Sendable {
     /// width × height × 3 bytes, the resolution is not a positive finite
     /// number, or the page size is not positive and finite.
     public init(width: Int, height: Int, dpi: Double, pageSize: CGSize, pixels: [UInt8]) throws {
-        guard dpi.isFinite, dpi > 0 else { throw PDFVisualDiffError.invalidResolution(dpi) }
+        guard dpi.isFinite, dpi >= Self.minDPI, dpi <= Self.maxDPI else { throw PDFVisualDiffError.invalidResolution(dpi) }
         guard pageSize.width.isFinite, pageSize.height.isFinite, pageSize.width > 0, pageSize.height > 0 else {
             throw PDFVisualDiffError.invalidPageSize(width: Double(pageSize.width), height: Double(pageSize.height))
         }
@@ -39,6 +39,8 @@ public struct PageRaster: Equatable, Sendable {
     /// Bitmap pixels per bp.
     public var scale: Double { dpi / 72 }
 
+    /// The lowest resolution accepted; far below it the scale can vanish.
+    public static let minDPI = 1.0
     /// The highest resolution accepted.
     public static let maxDPI = 2400.0
     /// The largest bitmap accepted, in pixels. One render needs about 7 bytes
@@ -84,7 +86,7 @@ public struct PageRaster: Equatable, Sendable {
     /// The transform is the same as for a full render, so pixels line up
     /// with a full render.
     static func render(page: CGPDFPage, dpi: Double, clip: [CGRect]?) throws -> PageRaster {
-        guard dpi.isFinite, dpi > 0, dpi <= maxDPI else { throw PDFVisualDiffError.invalidResolution(dpi) }
+        guard dpi.isFinite, dpi >= minDPI, dpi <= maxDPI else { throw PDFVisualDiffError.invalidResolution(dpi) }
         let rotation = ((Int(page.rotationAngle) % 360) + 360) % 360
         guard rotation == 0 else { throw PDFVisualDiffError.unsupportedRotation(degrees: rotation) }
 

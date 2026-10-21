@@ -50,9 +50,10 @@ pass (`uncheckedPixels`), and one with a non-finite coordinate is refused.
 rounded 595 × 842), classifies sizes as exact A4, near A4 (within 1.5 bp) or
 other, finds ink in the strip that a top-left crop to A4 would remove (each
 pixel counted once), and finds ink drawn outside a page's crop box
-(`inkOutsideCropBox`), which every render clips away. That check scales x and
-y so the box edges fall on pixel boundaries, so ink on the page never counts
-and ink past the edge always does.
+(`inkOutsideCropBox`), which every render clips away. That check covers one
+page width or height beyond each edge and scales x and y so the box edges fall
+on pixel boundaries, so within that area ink on the page never counts and ink
+past the edge does. Ink farther away is not seen by any render.
 
 `DiffArtifacts.write` produces `diff_signed.png` (floor(128 + D/2)),
 `diff_abs.png` (255 − |D|), `diff.bin` (D as little-endian Int16, height ×

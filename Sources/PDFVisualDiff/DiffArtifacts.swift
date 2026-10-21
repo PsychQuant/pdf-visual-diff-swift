@@ -41,6 +41,28 @@ public enum DiffArtifacts {
         fileNames.map { directory.appendingPathComponent($0) }
     }
 
+    /// The first artifact of `directory` that would replace one of
+    /// `protected` (a URL and a role name), or nil. Files that do not exist
+    /// yet are compared by their parent directory with symbolic links
+    /// resolved and by name without regard to case, as on the default macOS
+    /// volume; existing files are also compared by file identity.
+    public static func collision(in directory: URL, with protected: [(URL, String)]) -> (artifact: URL, role: String)? {
+        func key(_ url: URL) -> String {
+            let parent = url.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
+            return (parent + "/" + url.lastPathComponent).lowercased()
+        }
+        func identity(_ url: URL) -> NSObject? {
+            (try? url.resourceValues(forKeys: [.fileResourceIdentifierKey]))?.fileResourceIdentifier as? NSObject
+        }
+        for artifact in paths(in: directory) {
+            for (url, role) in protected {
+                if key(artifact) == key(url) { return (artifact, role) }
+                if let a = identity(artifact), let b = identity(url), a.isEqual(b) { return (artifact, role) }
+            }
+        }
+        return nil
+    }
+
     public static let rawFormat = "int16-le, row-major height x width x 3 (R,G,B), D = output - original"
 
     /// Pass the results of the checks that ran: `checks` for an overlay,

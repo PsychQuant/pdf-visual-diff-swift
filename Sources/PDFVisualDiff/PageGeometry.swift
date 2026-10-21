@@ -68,13 +68,19 @@ public enum PageGeometry {
     /// the edge does. The resolution is lowered when the 3 × 3 page area
     /// would exceed the bitmap limit.
     public static func inkOutsideCropBox(page: CGPDFPage, dpi: Double = 72) throws -> Int {
-        guard dpi.isFinite, dpi > 0, dpi <= PageRaster.maxDPI else { throw PDFVisualDiffError.invalidResolution(dpi) }
+        guard dpi.isFinite, dpi >= PageRaster.minDPI, dpi <= PageRaster.maxDPI else { throw PDFVisualDiffError.invalidResolution(dpi) }
         let box = page.getBoxRect(.cropBox)
         let area = Double(box.width) * 3 * Double(box.height) * 3
-        let fitting = 72 * (Double(PageRaster.maxPixelCount) / area).squareRoot() * 0.99
-        let scale = min(dpi, fitting) / 72
+        var scale = min(dpi, 72 * (Double(PageRaster.maxPixelCount) / area).squareRoot()) / 72
         // Whole pixels per box side, and the scales that make them exact.
-        let boxW = max(1, (box.width * scale).rounded()), boxH = max(1, (box.height * scale).rounded())
+        // Each side is at least one pixel, which for an extreme aspect ratio
+        // can still exceed the limit; keep lowering the scale until it fits.
+        var boxW = 1.0, boxH = 1.0
+        repeat {
+            boxW = max(1, (box.width * scale).rounded())
+            boxH = max(1, (box.height * scale).rounded())
+            scale /= 2
+        } while boxW * boxH * 9 > Double(PageRaster.maxPixelCount) && scale > 0
         let w = boxW * 3, h = boxH * 3
         guard w.isFinite, h.isFinite, w * h <= Double(PageRaster.maxPixelCount) else {
             throw PDFVisualDiffError.bitmapTooLarge(width: w, height: h, limit: PageRaster.maxPixelCount)

@@ -25,7 +25,7 @@ public enum PDFVisualDiffError: Error, Equatable, CustomStringConvertible {
         case .unsupportedRotation(let degrees):
             return "page rotation \(degrees)° is not supported; only unrotated pages can be compared"
         case .invalidResolution(let dpi):
-            return "resolution must be a finite number of dpi above 0 and at most \(Int(PageRaster.maxDPI)), got \(dpi)"
+            return "resolution must be between \(Int(PageRaster.minDPI)) and \(Int(PageRaster.maxDPI)) dpi, got \(dpi)"
         case let .bitmapContextUnavailable(width, height):
             return "cannot allocate a \(width)×\(height) bitmap"
         case let .bitmapTooLarge(width, height, limit):
@@ -35,7 +35,7 @@ public enum PDFVisualDiffError: Error, Equatable, CustomStringConvertible {
         case let .invalidPageSize(width, height):
             return "a page size must be positive and finite, got \(width) × \(height) bp"
         case .invalidRegion(let index):
-            return "preserved region \(index) must have finite coordinates with left < right and top < bottom"
+            return "preserved region \(index) must have finite coordinates and edges, with left < right and top < bottom"
         case .sizeMismatch(let detail):
             return "rasters do not line up: \(detail)"
         case .inkInRemovedStrip(let pixels):

@@ -52,7 +52,13 @@ public enum PreservedRegions {
             // The area can exceed Int (or even Double) range; 2^62 is a cap
             // that converts to Int exactly, unlike Double(Int.max) = 2^63.
             let area = (px1 - px0) * (py1 - py0)
-            let unchecked = area == Double(checked) ? 0 : Int(min(max(1, area - Double(checked)), Self.uncheckedCap))
+            var unchecked = area == Double(checked) ? 0 : Int(min(max(1, area - Double(checked)), Self.uncheckedCap))
+            // Decided in bp, not from pixel arithmetic: far away, floating
+            // point can lose a region's width entirely, but a region that
+            // is not wholly on the compared area can never pass.
+            let insideCompared = rect.minX >= 0 && rect.minY >= 0
+                && rect.maxX * s <= Double(diff.width) && rect.maxY * s <= Double(diff.height)
+            if !insideCompared { unchecked = max(1, unchecked) }
             return PreservedRegionResult(index: index, left: rect.minX, top: rect.minY,
                                          right: rect.maxX, bottom: rect.maxY, changedPixels: changed,
                                          uncheckedPixels: unchecked)
