@@ -23,6 +23,10 @@ public struct PreservedRegionResult: Codable, Equatable, Sendable {
 public enum PreservedRegions {
     /// The largest unchecked-pixel count reported; larger areas saturate here.
     static let uncheckedCap = 4_611_686_018_427_387_904.0  // 2^62
+    /// How far a region may reach past the page edge and still count as on
+    /// the page: half of 0.01 bp, so a page size printed to two decimals
+    /// (595.28 for 595.2756) can be typed back as a region.
+    public static let pageEdgeSlack = 0.005
 
     /// `rects` are in bp with a top-left origin. A rectangle with a
     /// non-finite coordinate or no area is refused.
@@ -58,9 +62,19 @@ public enum PreservedRegions {
             // up past the page edge, but a region that is not wholly on the
             // page area both documents share can never pass.
             let insideCompared = rect.minX >= 0 && rect.minY >= 0
-                && rect.maxX <= Double(diff.pageSize.width) && rect.maxY <= Double(diff.pageSize.height)
+                && rect.maxX <= Double(diff.pageSize.width) + Self.pageEdgeSlack
+                && rect.maxY <= Double(diff.pageSize.height) + Self.pageEdgeSlack
                 && rect.maxX * s <= Double(diff.width) && rect.maxY * s <= Double(diff.height)
-            if !insideCompared { unchecked = max(1, unchecked) }
+            if !insideCompared {
+                // The part past the shared page counts as unchecked even where
+                // the rounded-up raster has pixels for it.
+                let pageWidth = Double(diff.pageSize.width) * s, pageHeight = Double(diff.pageSize.height) * s
+                let onPage = max(0, min(rect.maxX * s, pageWidth) - max(rect.minX * s, 0))
+                    * max(0, min(rect.maxY * s, pageHeight) - max(rect.minY * s, 0))
+                let past = (rect.width * s) * (rect.height * s) - onPage
+                let pastPixels = past.isFinite ? Int(min(max(1, past.rounded(.up)), Self.uncheckedCap)) : Int(Self.uncheckedCap)
+                unchecked = max(unchecked, pastPixels)
+            }
             return PreservedRegionResult(index: index, left: rect.minX, top: rect.minY,
                                          right: rect.maxX, bottom: rect.maxY, changedPixels: changed,
                                          uncheckedPixels: unchecked)

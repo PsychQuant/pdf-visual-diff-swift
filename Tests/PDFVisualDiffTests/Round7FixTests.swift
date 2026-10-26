@@ -20,7 +20,8 @@ struct Round7FixTests {
         let page = try Self.blankA4()
         let diff = try SignedDiff(original: page, output: page)
         let result = try PreservedRegions.check([CGRect(x: 595.3, y: 10, width: 0.1, height: 10)], diff: diff)
-        #expect(result[0].uncheckedPixels > 0)
+        // 0.1 × 10 bp at 144 dpi is 0.2 × 20 = 4 pixels, all past the page.
+        #expect(result[0].uncheckedPixels == 4)
         #expect(!result[0].passed)
     }
 
@@ -30,6 +31,16 @@ struct Round7FixTests {
         let diff = try SignedDiff(original: page, output: page)
         let result = try PreservedRegions.check([CGRect(x: 500, y: 10, width: 95, height: 10)], diff: diff)
         #expect(result[0].passed)
+    }
+
+    @Test("a region typed with the page size printed to two decimals passes", arguments: [
+        CGRect(x: 0, y: 0, width: 595.28, height: 841.89),
+        CGRect(x: 0, y: 800, width: 595.28, height: 41.89),
+    ])
+    func regionAtPrintedPageSize(rect: CGRect) throws {
+        let page = try Self.blankA4()
+        let diff = try SignedDiff(original: page, output: page)
+        #expect(try PreservedRegions.check([rect], diff: diff)[0].passed)
     }
 
     @Test("the shared page area is the smaller of the two pages")

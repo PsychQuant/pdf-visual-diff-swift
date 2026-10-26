@@ -41,8 +41,9 @@ struct PreservedRegionsTests {
         let d = try diff([], [])
         let result = try #require(try PreservedRegions.check([CGRect(x: 590, y: 830, width: 100, height: 100)], diff: d).first)
         #expect(result.changedPixels == 0)
-        // 200 × 200 pixels at 144 dpi, of which 11 × 24 lie on the A4 raster.
-        #expect(result.uncheckedPixels == 200 * 200 - 11 * 24)
+        // 200 × 200 pixels at 144 dpi; 10.55 × 23.78 of them lie on the A4
+        // page (1190.55 × 1683.78 pixels), so 39 749.1 lie past it: 39 750.
+        #expect(result.uncheckedPixels == 39_750)
         #expect(!result.passed)
     }
 }
