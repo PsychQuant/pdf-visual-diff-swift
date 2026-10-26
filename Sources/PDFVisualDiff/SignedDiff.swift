@@ -23,6 +23,10 @@ public struct SignedDiff: Sendable {
     /// region exist on one side only and D says nothing about them; a page
     /// size difference smaller than a pixel would not show in D at all.
     public let sizesMatch: Bool
+    /// The page area both documents share, in bp: the smaller width and the
+    /// smaller height of the two pages. The rasters round up to whole
+    /// pixels, so they can extend slightly past it.
+    public let pageSize: CGSize
 
     public init(original: PageRaster, output: PageRaster) throws {
         guard original.dpi == output.dpi else {
@@ -61,6 +65,8 @@ public struct SignedDiff: Sendable {
         self.channelMax = high
         self.sizesMatch = original.width == output.width && original.height == output.height
             && original.pageSize == output.pageSize
+        self.pageSize = CGSize(width: min(original.pageSize.width, output.pageSize.width),
+                               height: min(original.pageSize.height, output.pageSize.height))
     }
 
     /// Bitmap pixels per bp.

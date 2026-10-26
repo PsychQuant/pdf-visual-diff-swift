@@ -54,9 +54,11 @@ public enum PreservedRegions {
             let area = (px1 - px0) * (py1 - py0)
             var unchecked = area == Double(checked) ? 0 : Int(min(max(1, area - Double(checked)), Self.uncheckedCap))
             // Decided in bp, not from pixel arithmetic: far away, floating
-            // point can lose a region's width entirely, but a region that
-            // is not wholly on the compared area can never pass.
+            // point can lose a region's width entirely, and the rasters round
+            // up past the page edge, but a region that is not wholly on the
+            // page area both documents share can never pass.
             let insideCompared = rect.minX >= 0 && rect.minY >= 0
+                && rect.maxX <= Double(diff.pageSize.width) && rect.maxY <= Double(diff.pageSize.height)
                 && rect.maxX * s <= Double(diff.width) && rect.maxY * s <= Double(diff.height)
             if !insideCompared { unchecked = max(1, unchecked) }
             return PreservedRegionResult(index: index, left: rect.minX, top: rect.minY,
