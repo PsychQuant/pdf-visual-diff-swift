@@ -46,7 +46,9 @@ public struct PageRaster: Equatable, Sendable {
     /// The largest bitmap accepted, in pixels. One render needs about 7 bytes
     /// per pixel while it runs (RGBA bitmap plus the RGB copy) and keeps 3. A
     /// verification holds three renders and D (6 bytes per pixel), about 15
-    /// bytes per pixel, so this keeps one verification under roughly 1.5 GB.
+    /// bytes per pixel, so this keeps one verification under roughly 1.5 GB
+    /// (about 18 bytes per pixel, 1.8 GB, when a caller draws the original a
+    /// second time on a taller canvas).
     public static let maxPixelCount = 100_000_000
 
     public func rgb(x: Int, y: Int) -> [UInt8] {
@@ -70,9 +72,10 @@ public struct PageRaster: Equatable, Sendable {
     /// the bitmap height, so renders compared pixel by pixel use one height
     /// and are cropped to their own afterwards.
     ///
-    /// A resolution or height that no render accepts contributes 1, which
-    /// never raises the canvas, so the render that follows reports the error
-    /// instead of this function trapping on the conversion to `Int`.
+    /// A resolution that is not finite and positive, or a height that gives
+    /// no finite row count of at least 1, contributes 1, which never raises
+    /// the canvas; the render that follows reports the error instead of this
+    /// function trapping on the conversion to `Int`.
     public static func canvasHeight(heights: [CGFloat], dpi: Double) -> Int {
         guard dpi.isFinite, dpi > 0 else { return 1 }
         let scale = dpi / 72
