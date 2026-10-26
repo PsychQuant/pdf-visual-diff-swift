@@ -69,9 +69,18 @@ public struct PageRaster: Equatable, Sendable {
     /// are to be compared: CoreGraphics' anti-aliasing is not invariant under
     /// the bitmap height, so renders compared pixel by pixel use one height
     /// and are cropped to their own afterwards.
+    ///
+    /// A resolution or height that no render accepts contributes 1, which
+    /// never raises the canvas, so the render that follows reports the error
+    /// instead of this function trapping on the conversion to `Int`.
     public static func canvasHeight(heights: [CGFloat], dpi: Double) -> Int {
+        guard dpi.isFinite, dpi > 0 else { return 1 }
         let scale = dpi / 72
-        return heights.map { Int(min(Double(maxPixelCount), (Double($0) * scale).rounded(.up))) }.max() ?? 1
+        return heights.map { height -> Int in
+            let rows = (Double(height) * scale).rounded(.up)
+            guard rows.isFinite, rows >= 1 else { return 1 }
+            return Int(min(Double(maxPixelCount), rows))
+        }.max() ?? 1
     }
 
     /// Opens `url` and returns the page at the 0-based `index`.
