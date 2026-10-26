@@ -54,6 +54,25 @@ struct Round7FixTests {
         #expect(try !PreservedRegions.check([CGRect(x: 100.001, y: 0, width: 0.003, height: 10)], diff: diff)[0].passed)
     }
 
+    @Test("a region typed back with the printed width passes on A4 at whole-pixel resolutions",
+          arguments: [127.0, 254.0])
+    func slackAtWholePixelResolutions(dpi: Double) throws {
+        let size = CGSize(width: 210 / 25.4 * 72, height: 297 / 25.4 * 72)
+        let width = Int((size.width * dpi / 72).rounded(.up)), height = Int((size.height * dpi / 72).rounded(.up))
+        let page = try PageRaster(width: width, height: height, dpi: dpi, pageSize: size,
+                                  pixels: [UInt8](repeating: 255, count: width * height * 3))
+        let diff = try SignedDiff(original: page, output: page)
+        for x in [32.19, 32.44, 32.69, 33.19, 0, 10, 100.5] {
+            let rect = CGRect(x: x, y: 10, width: 595.28 - x, height: 10)
+            #expect(try PreservedRegions.check([rect], diff: diff)[0].passed, "x = \(x)")
+        }
+    }
+
+    @Test("renders compared with one canvas height map the page identically")
+    func canvasHeightGivesOneMapping() throws {
+        #expect(PageRaster.canvasHeight(heights: [843, 841.8898], dpi: 144) == 1686)
+    }
+
     @Test("the shared page area is the smaller of the two pages")
     func sharedPageSize() throws {
         let a = try Self.blankA4()

@@ -38,19 +38,17 @@ public enum PreservedRegions {
                 throw PDFVisualDiffError.invalidRegion(index: index)
             }
             // A right or bottom edge within the slack past the page edge is
-            // taken as the page edge, so the raster's own edge cannot veto it.
-            var rect = given
+            // taken as the page edge itself, so the raster's own edge cannot
+            // veto it (no width arithmetic, which could land an ulp past).
+            let rect = given
             let pageWidth = Double(diff.pageSize.width), pageHeight = Double(diff.pageSize.height)
-            if rect.minX < pageWidth, rect.maxX > pageWidth, rect.maxX <= pageWidth + Self.pageEdgeSlack {
-                rect.size.width = pageWidth - rect.minX
-            }
-            if rect.minY < pageHeight, rect.maxY > pageHeight, rect.maxY <= pageHeight + Self.pageEdgeSlack {
-                rect.size.height = pageHeight - rect.minY
-            }
+            let snapX = rect.minX < pageWidth && rect.maxX > pageWidth && rect.maxX <= pageWidth + Self.pageEdgeSlack
+            let snapY = rect.minY < pageHeight && rect.maxY > pageHeight && rect.maxY <= pageHeight + Self.pageEdgeSlack
+            let maxX = snapX ? pageWidth : Double(rect.maxX), maxY = snapY ? pageHeight : Double(rect.maxY)
             // Pixel edges in Double: a region far off the page keeps its true
             // size here, so it can never collapse to an empty, passing region.
             let px0 = (rect.minX * s).rounded(.down), py0 = (rect.minY * s).rounded(.down)
-            let px1 = (rect.maxX * s).rounded(.up), py1 = (rect.maxY * s).rounded(.up)
+            let px1 = (maxX * s).rounded(.up), py1 = (maxY * s).rounded(.up)
             guard [px0, py0, px1, py1].allSatisfy(\.isFinite) else {
                 throw PDFVisualDiffError.invalidRegion(index: index)
             }
@@ -72,15 +70,14 @@ public enum PreservedRegions {
             // up past the page edge, but a region that is not wholly on the
             // page area both documents share can never pass.
             let insideCompared = rect.minX >= 0 && rect.minY >= 0
-                && rect.maxX <= Double(diff.pageSize.width) + Self.pageEdgeSlack
-                && rect.maxY <= Double(diff.pageSize.height) + Self.pageEdgeSlack
-                && rect.maxX * s <= Double(diff.width) && rect.maxY * s <= Double(diff.height)
+                && maxX <= pageWidth && maxY <= pageHeight
+                && maxX * s <= Double(diff.width) && maxY * s <= Double(diff.height)
             if !insideCompared {
                 // The part past the shared page counts as unchecked even where
                 // the rounded-up raster has pixels for it.
-                let pageWidth = Double(diff.pageSize.width) * s, pageHeight = Double(diff.pageSize.height) * s
-                let onPage = max(0, min(rect.maxX * s, pageWidth) - max(rect.minX * s, 0))
-                    * max(0, min(rect.maxY * s, pageHeight) - max(rect.minY * s, 0))
+                let pixelWidth = pageWidth * s, pixelHeight = pageHeight * s
+                let onPage = max(0, min(rect.maxX * s, pixelWidth) - max(rect.minX * s, 0))
+                    * max(0, min(rect.maxY * s, pixelHeight) - max(rect.minY * s, 0))
                 let past = (rect.width * s) * (rect.height * s) - onPage
                 let pastPixels = past.isFinite ? Int(min(max(1, past.rounded(.up)), Self.uncheckedCap)) : Int(Self.uncheckedCap)
                 unchecked = max(unchecked, pastPixels)

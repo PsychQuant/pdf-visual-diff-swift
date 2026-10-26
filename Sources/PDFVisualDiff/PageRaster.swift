@@ -61,8 +61,17 @@ public struct PageRaster: Equatable, Sendable {
         return pixels[i] == 255 && pixels[i + 1] == 255 && pixels[i + 2] == 255
     }
 
-    public static func render(url: URL, pageIndex: Int = 0, dpi: Double = 144) throws -> PageRaster {
-        try render(page: page(url: url, index: pageIndex), dpi: dpi)
+    public static func render(url: URL, pageIndex: Int = 0, dpi: Double = 144, canvasHeight: Int? = nil) throws -> PageRaster {
+        try render(page: page(url: url, index: pageIndex), dpi: dpi, canvasHeight: canvasHeight)
+    }
+
+    /// The bitmap height that pages of these heights (in bp) share when they
+    /// are to be compared: CoreGraphics' anti-aliasing is not invariant under
+    /// the bitmap height, so renders compared pixel by pixel use one height
+    /// and are cropped to their own afterwards.
+    public static func canvasHeight(heights: [CGFloat], dpi: Double) -> Int {
+        let scale = dpi / 72
+        return heights.map { Int(min(Double(maxPixelCount), (Double($0) * scale).rounded(.up))) }.max() ?? 1
     }
 
     /// Opens `url` and returns the page at the 0-based `index`.
@@ -77,15 +86,18 @@ public struct PageRaster: Equatable, Sendable {
         return page
     }
 
-    public static func render(page: CGPDFPage, dpi: Double = 144) throws -> PageRaster {
-        try render(page: page, dpi: dpi, clip: nil)
+    /// `canvasHeight`, when larger than the page's own bitmap height, is the
+    /// height the page is drawn into (top-aligned) before the bitmap is cropped
+    /// to the page; see `canvasHeight(heights:dpi:)`.
+    public static func render(page: CGPDFPage, dpi: Double = 144, canvasHeight: Int? = nil) throws -> PageRaster {
+        try render(page: page, dpi: dpi, clip: nil, canvasHeight: canvasHeight)
     }
 
     /// Renders `page`; when `clip` is given (rectangles in PDF page
     /// coordinates), only the part of the page inside their union is drawn.
     /// The transform is the same as for a full render, so pixels line up
     /// with a full render.
-    static func render(page: CGPDFPage, dpi: Double, clip: [CGRect]?) throws -> PageRaster {
+    static func render(page: CGPDFPage, dpi: Double, clip: [CGRect]?, canvasHeight: Int? = nil) throws -> PageRaster {
         guard dpi.isFinite, dpi >= minDPI, dpi <= maxDPI else { throw PDFVisualDiffError.invalidResolution(dpi) }
         let rotation = ((Int(page.rotationAngle) % 360) + 360) % 360
         guard rotation == 0 else { throw PDFVisualDiffError.unsupportedRotation(degrees: rotation) }
@@ -97,19 +109,24 @@ public struct PageRaster: Equatable, Sendable {
             throw PDFVisualDiffError.bitmapTooLarge(width: w, height: h, limit: maxPixelCount)
         }
         let width = Int(w), height = Int(h)
+        let canvas = max(height, canvasHeight ?? height)
+        guard Double(width) * Double(canvas) <= Double(maxPixelCount) else {
+            throw PDFVisualDiffError.bitmapTooLarge(width: w, height: Double(canvas), limit: maxPixelCount)
+        }
         guard
               let space = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(
-                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                data: nil, width: width, height: canvas, bitsPerComponent: 8, bytesPerRow: width * 4,
                 space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
         else {
-            throw PDFVisualDiffError.bitmapContextUnavailable(width: width, height: height)
+            throw PDFVisualDiffError.bitmapContextUnavailable(width: width, height: canvas)
         }
 
         context.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        // Put the box's top-left corner at the bitmap's top-left corner.
-        context.translateBy(x: 0, y: CGFloat(height))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: canvas))
+        // Put the box's top-left corner at the bitmap's top-left corner; the
+        // first `height` rows in memory are the page.
+        context.translateBy(x: 0, y: CGFloat(canvas))
         context.scaleBy(x: scale, y: scale)
         context.translateBy(x: -box.minX, y: -box.maxY)
         context.clip(to: box)
