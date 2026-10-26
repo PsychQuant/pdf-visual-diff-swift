@@ -32,10 +32,20 @@ public enum PreservedRegions {
     /// non-finite coordinate or no area is refused.
     public static func check(_ rects: [CGRect], diff: SignedDiff) throws -> [PreservedRegionResult] {
         let s = diff.scale
-        return try rects.enumerated().map { index, rect in
-            let edges = [rect.origin.x, rect.origin.y, rect.size.width, rect.size.height]
-            guard edges.allSatisfy(\.isFinite), rect.size.width > 0, rect.size.height > 0 else {
+        return try rects.enumerated().map { index, given in
+            let edges = [given.origin.x, given.origin.y, given.size.width, given.size.height]
+            guard edges.allSatisfy(\.isFinite), given.size.width > 0, given.size.height > 0 else {
                 throw PDFVisualDiffError.invalidRegion(index: index)
+            }
+            // A right or bottom edge within the slack past the page edge is
+            // taken as the page edge, so the raster's own edge cannot veto it.
+            var rect = given
+            let pageWidth = Double(diff.pageSize.width), pageHeight = Double(diff.pageSize.height)
+            if rect.minX < pageWidth, rect.maxX > pageWidth, rect.maxX <= pageWidth + Self.pageEdgeSlack {
+                rect.size.width = pageWidth - rect.minX
+            }
+            if rect.minY < pageHeight, rect.maxY > pageHeight, rect.maxY <= pageHeight + Self.pageEdgeSlack {
+                rect.size.height = pageHeight - rect.minY
             }
             // Pixel edges in Double: a region far off the page keeps its true
             // size here, so it can never collapse to an empty, passing region.
@@ -75,8 +85,8 @@ public enum PreservedRegions {
                 let pastPixels = past.isFinite ? Int(min(max(1, past.rounded(.up)), Self.uncheckedCap)) : Int(Self.uncheckedCap)
                 unchecked = max(unchecked, pastPixels)
             }
-            return PreservedRegionResult(index: index, left: rect.minX, top: rect.minY,
-                                         right: rect.maxX, bottom: rect.maxY, changedPixels: changed,
+            return PreservedRegionResult(index: index, left: given.minX, top: given.minY,
+                                         right: given.maxX, bottom: given.maxY, changedPixels: changed,
                                          uncheckedPixels: unchecked)
         }
     }

@@ -43,6 +43,17 @@ struct Round7FixTests {
         #expect(try PreservedRegions.check([rect], diff: diff)[0].passed)
     }
 
+    @Test("the slack holds on a page whose size is a whole number of pixels")
+    func slackOnWholePixelPage() throws {
+        let page = try PageRaster(width: 100, height: 100, dpi: 72, pageSize: CGSize(width: 100, height: 100),
+                                  pixels: [UInt8](repeating: 255, count: 100 * 100 * 3))
+        let diff = try SignedDiff(original: page, output: page)
+        #expect(try PreservedRegions.check([CGRect(x: 0, y: 0, width: 100.004, height: 10)], diff: diff)[0].passed)
+        #expect(try PreservedRegions.check([CGRect(x: 0, y: 0, width: 10, height: 100.004)], diff: diff)[0].passed)
+        #expect(try !PreservedRegions.check([CGRect(x: 0, y: 0, width: 100.01, height: 10)], diff: diff)[0].passed)
+        #expect(try !PreservedRegions.check([CGRect(x: 100.001, y: 0, width: 0.003, height: 10)], diff: diff)[0].passed)
+    }
+
     @Test("the shared page area is the smaller of the two pages")
     func sharedPageSize() throws {
         let a = try Self.blankA4()
